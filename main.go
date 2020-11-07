@@ -11,22 +11,12 @@ import (
 	"github.com/docker/docker/client"
 )
 
-const (
-	versioningModeLabel = "lookbuilding.mode"
-)
-
-type VersioningMode string
-
-const (
-	SemVerAny VersioningMode = "SemVerAny"
-)
-
 type labeledContainer struct {
 	container types.Container
 	mode      VersioningMode
 }
 
-type tag struct {
+type Tag struct {
 	Creator             int     `json:"creator"`
 	ID                  int     `json:"id"`
 	LastUpdated         string  `json:"last_updated"`
@@ -39,10 +29,10 @@ type tag struct {
 	TagStatus           string  `json:"tag_status"`
 	TagLastPulled       string  `json:"tag_last_pulled"`
 	TagLastPushed       string  `json:"tag_last_pushed"`
-	Images              []image `json:images`
+	Images              []Image `json:images`
 }
 
-type image struct {
+type Image struct {
 	Architecture string `json:architecture`
 	Features     string `json:features`
 	Digest       string `json:digest`
@@ -82,10 +72,10 @@ func getImageParts(name string) (*string, string, *string) {
 	return owner, repository, tag
 }
 
-func getDockerRepoTags(maybe_owner *string, repository string) []tag {
+func getDockerRepoTags(maybe_owner *string, repository string) []Tag {
 	type dockerPollResponse struct {
 		Count   int   `json:"count"`
-		Results []tag `json:"results"`
+		Results []Tag `json:"results"`
 	}
 
 	owner := "_"
@@ -116,19 +106,26 @@ func getLabeledContainers(cli *client.Client) []labeledContainer {
 		panic(err)
 	}
 
+	fmt.Println("scanning running container labels")
 	for _, container := range containers {
-		fmt.Printf("%s %s\n", container.ID[:10], container.Image)
+		fmt.Printf("- %s %s\n", container.ID[:10], container.Image)
 		for k, v := range container.Labels {
+			fmt.Printf("  - \"%s\": \"%s\"\n", k, v)
 			if k == versioningModeLabel {
+				mode := ParseVersioningMode(v)
+				if mode == nil {
+					fmt.Printf("Failed to parse '%s' as a versioning mode\n", v)
+					continue
+				}
+
 				lc := labeledContainer{
 					container,
-					SemVerAny,
+					*mode,
 				}
 
 				out = append(out, lc)
-				continue;
+				continue
 			}
-			fmt.Printf("  - %s: %s\n", k, v)
 		}
 	}
 
@@ -142,6 +139,8 @@ func main() {
 	}
 
 	labeledContainers := getLabeledContainers(cli)
+	fmt.Println()
+
 	for _, lc := range labeledContainers {
 		owner, repository, tag := getImageParts(lc.container.Image)
 
@@ -150,21 +149,26 @@ func main() {
 		} else {
 			fmt.Printf("container image: _/%s\n", repository)
 		}
+		fmt.Printf("  versioning: %+v\n", lc.mode.Label())
 
 		fmt.Printf("  id: %s\n", lc.container.ImageID)
 
 		if tag != nil {
-			fmt.Printf("  tag: %s\n", *tag)
+			fmt.Printf("  current tag: %s\n", *tag)
 		} else {
-			fmt.Printf("  no tag\n")
+			fmt.Printf("  no current tag, skipping\n")
+			continue
 		}
 
 		repoTags := getDockerRepoTags(owner, repository)
 
-		fmt.Println("## tags in registry ##")
+		fmt.Println("  tags in registry:")
 		for _, tag := range repoTags {
-			fmt.Printf("  tag: %s\n", tag.Name)
+			fmt.Printf("  - \"%s\"\n", tag.Name)
+			svt := parseTagAsSemVer(tag.Name)
+			if svt != nil {
+				fmt.Printf("    semver: true\n")
+			}
 		}
-		fmt.Println("##")
 	}
 }
