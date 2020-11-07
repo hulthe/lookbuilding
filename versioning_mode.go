@@ -1,5 +1,9 @@
 package main
 
+import (
+	"sort"
+)
+
 const (
 	versioningModeLabel = "lookbuilding.mode"
 )
@@ -30,7 +34,30 @@ func (SameTag) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
 
 func (SemVerMajor) Label() string { return "semver_major" }
 func (SemVerMajor) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
-	return nil // TODO: implement me
+	currentSemVer := parseTagAsSemVer(currentTag)
+	if currentSemVer == nil {
+		return nil
+	}
+
+	semverTags := make([]Tag, 0)
+
+	for _, tag := range availableTags {
+		if tag.SemVer != nil {
+			semverTags = append(semverTags, tag);
+		}
+	}
+
+	if len(semverTags) == 0 {
+		return nil
+	}
+
+	sort.Slice(semverTags, func(i, j int) bool {
+		a := semverTags[i].SemVer.version
+		b := semverTags[j].SemVer.version
+		return b.LessThan(a)
+	})
+
+	return &semverTags[0]
 }
 
 func (SemVerMinor) Label() string { return "semver_minor" }
