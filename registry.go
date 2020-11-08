@@ -16,7 +16,7 @@ type Tag struct {
 }
 
 func anonymousClient() (*registry.Registry, error) {
-	url      := "https://registry-1.docker.io/"
+	url := "https://registry-1.docker.io/"
 	username := "" // anonymous
 	password := "" // anonymous
 
@@ -43,7 +43,7 @@ func getDockerRepoTags(hub *registry.Registry, maybe_owner *string, repository s
 
 		svt := parseTagAsSemVer(tag)
 
-		out = append(out, Tag { tag, svt, digest })
+		out = append(out, Tag{tag, svt, digest})
 	}
 
 	return out, nil

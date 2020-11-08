@@ -42,7 +42,7 @@ func (SemVerMajor) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
 	semverTags := make([]Tag, 0)
 
 	for _, tag := range availableTags {
-		if tag.SemVer != nil {
+		if tag.SemVer != nil && currentSemVer.version.LessThan(tag.SemVer.version) {
 			semverTags = append(semverTags, tag);
 		}
 	}

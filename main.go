@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 
-	//"github.com/sirupsen/logrus" TODO
 	"github.com/docker/docker/client"
 )
 
-func main() {
+func checkForUpdates() {
 	cli, err := client.NewEnvClient()
 	if err != nil {
 		panic(err)
@@ -56,6 +56,28 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+		} else {
+			fmt.Println("  no update available")
 		}
+	}
+	fmt.Println("all done")
+}
+
+func main() {
+	addr := "0.0.0.0:8000"
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		go checkForUpdates()
+		fmt.Fprintf(w, "OK")
+	})
+
+	fs := http.FileServer(http.Dir("static/"))
+	http.Handle("/static/", http.StripPrefix("/static/", fs))
+
+	fmt.Printf("Listening on %s\n", addr)
+
+	err := http.ListenAndServe(addr, nil)
+	if err != nil {
+		panic(err)
 	}
 }

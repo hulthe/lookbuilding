@@ -12,7 +12,7 @@ var (
 )
 
 type SemVerTag struct {
-	prefix string
+	prefix  string
 	version semver.Version
 }
 
@@ -31,7 +31,7 @@ func parseTagAsSemVer(tag string) *SemVerTag {
 		return nil
 	}
 
-	svt := SemVerTag {
+	svt := SemVerTag{
 		prefix,
 		*version,
 	}
@@ -42,4 +42,3 @@ func parseTagAsSemVer(tag string) *SemVerTag {
 func (SemVerTag) asTag() string {
 	return ""
 }
-

@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"errors"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 )
@@ -111,18 +109,26 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 		return err
 	}
 
-	if len(lc.Container.Names) != 1 {
-		return errors.New("containers with more (or fewer) than 1 name are not supported")
-	}
-	name := lc.Container.Names[0]
-	tmpOldName := fmt.Sprintf("%s.lb.old", name)
-
 	fmt.Printf("Stopping container %s\n", lc.Container.ID)
 	// TODO: hopefully this is blocking
 	err = cli.ContainerStop(ctx, lc.Container.ID, nil)
 	if err != nil {
 		return err
 	}
+
+	oldContainer, err := cli.ContainerInspect(ctx, lc.Container.ID)
+	if err != nil {
+		return err
+	}
+
+	name := oldContainer.Name
+	tmpOldName := fmt.Sprintf("%s.lb.old", name)
+
+	config := oldContainer.Config
+	config.Image = image
+
+	hostConfig := oldContainer.HostConfig
+	hostConfig.VolumesFrom = []string{tmpOldName}
 
 	fmt.Printf("Renaming container %s\n", lc.Container.ID)
 	err = cli.ContainerRename(ctx, lc.Container.ID, tmpOldName)
@@ -131,29 +137,22 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 	}
 
 	fmt.Printf("Creating new container\n")
-	body, err := cli.ContainerCreate(ctx, &container.Config{
-		Image: image,
-		//Cmd: []string{"echo", "hello world"},
-		Labels: lc.Container.Labels,
-		Tty: false,
-	}, &container.HostConfig{
-		VolumesFrom: []string{tmpOldName},
-	}, &network.NetworkingConfig{
-		EndpointsConfig: lc.Container.NetworkSettings.Networks,
+	new, err := cli.ContainerCreate(ctx, oldContainer.Config, hostConfig, &network.NetworkingConfig{
+		EndpointsConfig: oldContainer.NetworkSettings.Networks,
 	}, name)
 
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Starting new container id: %s\n", body.ID)
-	err = cli.ContainerStart(ctx, body.ID, types.ContainerStartOptions{})
+	fmt.Printf("Starting new container id: %s\n", new.ID)
+	err = cli.ContainerStart(ctx, new.ID, types.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("Removing old container\n")
-	err = cli.ContainerRemove(ctx, tmpOldName, types.ContainerRemoveOptions{
+	err = cli.ContainerRemove(ctx, oldContainer.ID, types.ContainerRemoveOptions{
 		RemoveVolumes: false,
 		RemoveLinks:   false,
 		Force:         false,
