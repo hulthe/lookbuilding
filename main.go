@@ -60,7 +60,7 @@ func checkForUpdates() {
 			fmt.Println("  no update available")
 		}
 	}
-	fmt.Println("all done")
+	fmt.Println("All done")
 }
 
 func main() {

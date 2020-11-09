@@ -98,19 +98,21 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 	fmt.Printf("Pulling image \"%s\"\n", canonicalImage)
 
 	//containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
-	rc, err := cli.ImagePull(ctx, canonicalImage, types.ImagePullOptions{})
+	imageReader, err := cli.ImagePull(ctx, canonicalImage, types.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
 
-	// TODO: does it still pull the image if i just close the reader?
-	err = rc.Close()
+	defer imageReader.Close()
+
+	loadResponse, err := cli.ImageLoad(ctx, imageReader, false)
 	if err != nil {
 		return err
 	}
+
+	defer loadResponse.Body.Close()
 
 	fmt.Printf("Stopping container %s\n", lc.Container.ID)
-	// TODO: hopefully this is blocking
 	err = cli.ContainerStop(ctx, lc.Container.ID, nil)
 	if err != nil {
 		return err
