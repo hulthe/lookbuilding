@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/docker/docker/client"
+	"hulthe.net/lookbuilding/internal/pkg/semver"
 )
 
 var (
@@ -82,7 +83,7 @@ func checkAndDoUpdate() {
 
 		Logger.Infof(`tags in registry for "%s": %d`, name, len(repoTags))
 		for _, tag := range repoTags {
-			svt := parseTagAsSemVer(tag.Name)
+			svt := semver.ParseTagAsSemVer(tag.Name)
 			Logger.Infof(`tag_name="%s" semver=%t digest=%s`, tag.Name, svt != nil, tag.Digest)
 		}
 

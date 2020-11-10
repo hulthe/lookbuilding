@@ -1,4 +1,4 @@
-module lookbuilding
+module hulthe.net/lookbuilding
 
 go 1.15
 

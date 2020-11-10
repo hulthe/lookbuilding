@@ -3,16 +3,14 @@ package main
 import (
 	"fmt"
 	"github.com/heroku/docker-registry-client/registry"
-	d "github.com/opencontainers/go-digest"
-	//"github.com/docker/distribution/digest"
-	//"github.com/docker/distribution/manifest"
-	//"github.com/docker/libtrust"
+	digest "github.com/opencontainers/go-digest"
+	"hulthe.net/lookbuilding/internal/pkg/semver"
 )
 
 type Tag struct {
 	Name   string
-	SemVer *SemVerTag
-	Digest d.Digest
+	SemVer *semver.Tag
+	Digest digest.Digest
 }
 
 func anonymousClient() (*registry.Registry, error) {
@@ -30,9 +28,9 @@ func anonymousClient() (*registry.Registry, error) {
 	return registry, nil
 }
 
-func getDockerRepoTags(hub *registry.Registry, maybe_owner *string, repository string) ([]Tag, error) {
-	if maybe_owner != nil {
-		repository = fmt.Sprintf("%s/%s", *maybe_owner, repository)
+func getDockerRepoTags(hub *registry.Registry, maybeOwner *string, repository string) ([]Tag, error) {
+	if maybeOwner != nil {
+		repository = fmt.Sprintf("%s/%s", *maybeOwner, repository)
 	}
 
 	tags, err := hub.Tags(repository)
@@ -48,7 +46,7 @@ func getDockerRepoTags(hub *registry.Registry, maybe_owner *string, repository s
 			return nil, err
 		}
 
-		svt := parseTagAsSemVer(tag)
+		svt := semver.ParseTagAsSemVer(tag)
 
 		out = append(out, Tag{tag, svt, digest})
 	}

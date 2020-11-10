@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"hulthe.net/lookbuilding/internal/pkg/semver"
 	"sort"
 )
 
@@ -34,8 +35,8 @@ func (SameTag) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
 	return nil // TODO: implement me
 }
 
-func semVerShouldUpdate(currentTag string, availableTags []Tag, isValid func(current, available SemVerTag) bool) *Tag {
-	currentSemVer := parseTagAsSemVer(currentTag)
+func semVerShouldUpdate(currentTag string, availableTags []Tag, isValid func(current, available semver.Tag) bool) *Tag {
+	currentSemVer := semver.ParseTagAsSemVer(currentTag)
 	if currentSemVer == nil {
 		return nil
 	}
@@ -53,8 +54,8 @@ func semVerShouldUpdate(currentTag string, availableTags []Tag, isValid func(cur
 	}
 
 	sort.Slice(semverTags, func(i, j int) bool {
-		a := semverTags[i].SemVer.version
-		b := semverTags[j].SemVer.version
+		a := semverTags[i].SemVer.Version
+		b := semverTags[j].SemVer.Version
 		return b.LessThan(a)
 	})
 
@@ -63,28 +64,28 @@ func semVerShouldUpdate(currentTag string, availableTags []Tag, isValid func(cur
 
 func (SemVerMajor) Label() string { return "semver_major" }
 func (SemVerMajor) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
-	return semVerShouldUpdate(currentTag, availableTags, func(current, available SemVerTag) bool {
+	return semVerShouldUpdate(currentTag, availableTags, func(current, available semver.Tag) bool {
 		// The new version should be greater
-		return current.version.LessThan(available.version)
+		return current.Version.LessThan(available.Version)
 	})
 }
 
 func (SemVerMinor) Label() string { return "semver_minor" }
 func (SemVerMinor) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
-	return semVerShouldUpdate(currentTag, availableTags, func(current, available SemVerTag) bool {
+	return semVerShouldUpdate(currentTag, availableTags, func(current, available semver.Tag) bool {
 		// The new version should be greater, but still the same major number
-		return current.version.LessThan(available.version) &&
-			current.version.Major == available.version.Major
+		return current.Version.LessThan(available.Version) &&
+			current.Version.Major == available.Version.Major
 	})
 }
 
 func (SemVerPatch) Label() string { return "semver_patch" }
 func (SemVerPatch) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
-	return semVerShouldUpdate(currentTag, availableTags, func(current, available SemVerTag) bool {
+	return semVerShouldUpdate(currentTag, availableTags, func(current, available semver.Tag) bool {
 		// The new version should be greater, but still the same major & minor number
-		return current.version.LessThan(available.version) &&
-			current.version.Major == available.version.Major &&
-			current.version.Minor == available.version.Minor
+		return current.Version.LessThan(available.Version) &&
+			current.Version.Major == available.Version.Major &&
+			current.Version.Minor == available.Version.Minor
 	})
 }
 
