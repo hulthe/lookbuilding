@@ -20,7 +20,14 @@ func anonymousClient() (*registry.Registry, error) {
 	username := "" // anonymous
 	password := "" // anonymous
 
-	return registry.New(url, username, password)
+	registry, err := registry.New(url, username, password)
+	if err != nil {
+		return nil, err
+	}
+
+	registry.Logf = Logger.Infof
+
+	return registry, nil
 }
 
 func getDockerRepoTags(hub *registry.Registry, maybe_owner *string, repository string) ([]Tag, error) {
@@ -33,7 +40,7 @@ func getDockerRepoTags(hub *registry.Registry, maybe_owner *string, repository s
 		return nil, err
 	}
 
-	out := []Tag{}
+	var out []Tag
 
 	for _, tag := range tags {
 		digest, err := hub.ManifestDigest(repository, tag)

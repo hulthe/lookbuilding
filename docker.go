@@ -43,6 +43,15 @@ func (lc LabeledContainer) SplitImageParts() (*string, string, *string) {
 	return owner, repository, tag
 }
 
+func (lc LabeledContainer) GetName() string {
+	if len(lc.Container.Names) >= 0 {
+		// trim prefixed "/"
+		return lc.Container.Names[0][1:]
+	} else {
+		return lc.Container.ID[:10]
+	}
+}
+
 func combineImageParts(owner *string, repository string, tag *string) string {
 	image := repository
 	if owner != nil {
@@ -63,15 +72,15 @@ func getLabeledContainers(cli *client.Client) []LabeledContainer {
 		panic(err)
 	}
 
-	fmt.Println("scanning running container labels")
+	Logger.Infof("scanning running container labels")
 	for _, container := range containers {
-		fmt.Printf("- %s %s\n", container.ID[:10], container.Image)
+		Logger.Debugf("checking %s %s", container.ID[:10], container.Image)
 		for k, v := range container.Labels {
-			fmt.Printf("  - \"%s\": \"%s\"\n", k, v)
+			Logger.Debugf(`  - "%s": "%s"`, k, v)
 			if k == versioningModeLabel {
 				mode := ParseVersioningMode(v)
 				if mode == nil {
-					fmt.Printf("Failed to parse '%s' as a versioning mode\n", v)
+					Logger.Errorf(`Failed to parse "%s" as a versioning mode`, v)
 					continue
 				}
 
@@ -95,7 +104,7 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 	owner, repository, _ := lc.SplitImageParts()
 	image := combineImageParts(owner, repository, &tag.Name)
 	canonicalImage := fmt.Sprintf("docker.io/%s", image)
-	fmt.Printf("Pulling image \"%s\"\n", canonicalImage)
+	Logger.Infof(`pulling image "%s"`, canonicalImage)
 
 	//containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
 	imageReader, err := cli.ImagePull(ctx, canonicalImage, types.ImagePullOptions{})
@@ -132,13 +141,13 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 	hostConfig := oldContainer.HostConfig
 	hostConfig.VolumesFrom = []string{tmpOldName}
 
-	fmt.Printf("Renaming container %s\n", lc.Container.ID)
+	Logger.Infof(`renaming container %s`, lc.Container.ID)
 	err = cli.ContainerRename(ctx, lc.Container.ID, tmpOldName)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Creating new container\n")
+	Logger.Infof("creating new container")
 	new, err := cli.ContainerCreate(ctx, oldContainer.Config, hostConfig, &network.NetworkingConfig{
 		EndpointsConfig: oldContainer.NetworkSettings.Networks,
 	}, name)
@@ -147,13 +156,13 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 		return err
 	}
 
-	fmt.Printf("Starting new container id: %s\n", new.ID)
+	Logger.Infof("starting new container id: %s", new.ID)
 	err = cli.ContainerStart(ctx, new.ID, types.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Removing old container\n")
+	Logger.Infof("removing old container")
 	err = cli.ContainerRemove(ctx, oldContainer.ID, types.ContainerRemoveOptions{
 		RemoveVolumes: false,
 		RemoveLinks:   false,

@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"fmt"
 	"regexp"
 
 	"github.com/coreos/go-semver/semver"
@@ -16,7 +15,7 @@ type SemVerTag struct {
 	version semver.Version
 }
 
-// Return a 
+// Return a
 // Returns nil if the tag did not parse as semver
 func parseTagAsSemVer(tag string) *SemVerTag {
 	var prefix string
