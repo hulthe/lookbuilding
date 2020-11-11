@@ -1,7 +1,6 @@
 package versioning
 
 import (
-	"fmt"
 	"sort"
 
 	l "hulthe.net/lookbuilding/internal/pkg/logging"
