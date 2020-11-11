@@ -1,70 +1,19 @@
-package main
+package docker
 
 import (
 	"context"
 	"fmt"
-	"strings"
+
+	l "hulthe.net/lookbuilding/internal/pkg/logging"
+	"hulthe.net/lookbuilding/internal/pkg/registry"
+	"hulthe.net/lookbuilding/internal/pkg/versioning"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 )
 
-type LabeledContainer struct {
-	Container types.Container
-	Mode      VersioningMode
-}
-
-// Extract the repository owner (if any), repository and tag (if any) from a docker image name
-func (lc LabeledContainer) SplitImageParts() (*string, string, *string) {
-	name := lc.Container.Image
-
-	var repository string
-	var owner *string
-	var tag *string
-
-	slashIndex := strings.Index(name, "/")
-	if slashIndex >= 0 {
-		tmp := name[:slashIndex]
-		owner = &tmp
-		name = name[slashIndex+1:]
-	}
-
-	colonIndex := strings.Index(name, ":")
-	if colonIndex >= 0 {
-		tmp := name[colonIndex+1:]
-		tag = &tmp
-
-		repository = name[:colonIndex]
-	} else {
-		repository = name
-	}
-
-	return owner, repository, tag
-}
-
-func (lc LabeledContainer) GetName() string {
-	if len(lc.Container.Names) >= 0 {
-		// trim prefixed "/"
-		return lc.Container.Names[0][1:]
-	} else {
-		return lc.Container.ID[:10]
-	}
-}
-
-func combineImageParts(owner *string, repository string, tag *string) string {
-	image := repository
-	if owner != nil {
-		image = fmt.Sprintf("%s/%s", *owner, image)
-	}
-	if tag != nil {
-		image = fmt.Sprintf("%s:%s", image, *tag)
-	}
-
-	return image
-}
-
-func getLabeledContainers(cli *client.Client) []LabeledContainer {
+func GetLabeledContainers(cli *client.Client) []LabeledContainer {
 	out := make([]LabeledContainer, 0)
 
 	containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
@@ -72,15 +21,15 @@ func getLabeledContainers(cli *client.Client) []LabeledContainer {
 		panic(err)
 	}
 
-	Logger.Infof("scanning running container labels")
+	l.Logger.Infof("scanning running container labels")
 	for _, container := range containers {
-		Logger.Debugf("checking %s %s", container.ID[:10], container.Image)
+		l.Logger.Debugf("checking %s %s", container.ID[:10], container.Image)
 		for k, v := range container.Labels {
-			Logger.Debugf(`  - "%s": "%s"`, k, v)
-			if k == versioningModeLabel {
-				mode := ParseVersioningMode(v)
+			l.Logger.Debugf(`  - "%s": "%s"`, k, v)
+			if k == versioning.ModeLabel {
+				mode := versioning.ParseMode(v)
 				if mode == nil {
-					Logger.Errorf(`Failed to parse "%s" as a versioning mode`, v)
+					l.Logger.Errorf(`Failed to parse "%s" as a versioning mode`, v)
 					continue
 				}
 
@@ -98,13 +47,13 @@ func getLabeledContainers(cli *client.Client) []LabeledContainer {
 	return out
 }
 
-func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
+func (lc LabeledContainer) UpdateTo(cli *client.Client, tag registry.Tag) error {
 	ctx := context.Background()
 
 	owner, repository, _ := lc.SplitImageParts()
-	image := combineImageParts(owner, repository, &tag.Name)
+	image := CombineImageParts(owner, repository, &tag.Name)
 	canonicalImage := fmt.Sprintf("docker.io/%s", image)
-	Logger.Infof(`pulling image "%s"`, canonicalImage)
+	l.Logger.Infof(`pulling image "%s"`, canonicalImage)
 
 	//containers, err := cli.ContainerList(context.Background(), types.ContainerListOptions{})
 	imageReader, err := cli.ImagePull(ctx, canonicalImage, types.ImagePullOptions{})
@@ -141,13 +90,13 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 	hostConfig := oldContainer.HostConfig
 	hostConfig.VolumesFrom = []string{tmpOldName}
 
-	Logger.Infof(`renaming container %s`, lc.Container.ID)
+	l.Logger.Infof(`renaming container %s`, lc.Container.ID)
 	err = cli.ContainerRename(ctx, lc.Container.ID, tmpOldName)
 	if err != nil {
 		return err
 	}
 
-	Logger.Infof("creating new container")
+	l.Logger.Infof("creating new container")
 	new, err := cli.ContainerCreate(ctx, oldContainer.Config, hostConfig, &network.NetworkingConfig{
 		EndpointsConfig: oldContainer.NetworkSettings.Networks,
 	}, name)
@@ -156,13 +105,13 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 		return err
 	}
 
-	Logger.Infof("starting new container id: %s", new.ID)
+	l.Logger.Infof("starting new container id: %s", new.ID)
 	err = cli.ContainerStart(ctx, new.ID, types.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
 
-	Logger.Infof("removing old container")
+	l.Logger.Infof("removing old container")
 	err = cli.ContainerRemove(ctx, oldContainer.ID, types.ContainerRemoveOptions{
 		RemoveVolumes: false,
 		RemoveLinks:   false,
@@ -174,3 +123,4 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag Tag) error {
 
 	return nil
 }
+

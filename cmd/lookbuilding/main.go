@@ -5,30 +5,29 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/sirupsen/logrus"
+	l "hulthe.net/lookbuilding/internal/pkg/logging"
+	"hulthe.net/lookbuilding/internal/pkg/worker"
 )
 
-var (
-	Logger logrus.Logger = *logrus.New()
-)
+const EnvAddr = "LOOKBUILDING_ADDR"
 
 func main() {
-	addr, isPresent := os.LookupEnv(ENV_ADDR)
+	addr, isPresent := os.LookupEnv(EnvAddr)
 	if !isPresent {
 		addr = "0.0.0.0:8000"
 	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		TriggerScan()
+		worker.TriggerScan()
 		fmt.Fprintf(w, "OK")
 	})
 
 	fs := http.FileServer(http.Dir("static/"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
-	Logger.Infof(`listening on %s`, addr)
+	l.Logger.Infof(`listening on %s`, addr)
 
-	go Worker()
+	go worker.Worker()
 
 	err := http.ListenAndServe(addr, nil)
 	if err != nil {

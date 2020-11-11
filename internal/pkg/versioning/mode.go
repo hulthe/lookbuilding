@@ -1,18 +1,19 @@
-package main
+package versioning
 
 import (
 	"fmt"
-	"hulthe.net/lookbuilding/internal/pkg/semver"
 	"sort"
+
+	l "hulthe.net/lookbuilding/internal/pkg/logging"
+	"hulthe.net/lookbuilding/internal/pkg/registry"
+	"hulthe.net/lookbuilding/internal/pkg/semver"
 )
 
-const (
-	versioningModeLabel = "lookbuilding.mode"
-)
+const ModeLabel = "lookbuilding.mode"
 
-type VersioningMode interface {
+type Mode interface {
 	Label() string
-	ShouldUpdate(currentTag string, availableTags []Tag) *Tag
+	ShouldUpdate(currentTag string, availableTags []registry.Tag) *registry.Tag
 }
 
 type SameTag struct{}
@@ -21,7 +22,7 @@ type SemVerMinor struct{}
 type SemVerPatch struct{}
 
 var (
-	AllModes = [...]VersioningMode{
+	AllModes = [...]Mode{
 		SameTag{},
 		SemVerMajor{},
 		SemVerMinor{},
@@ -30,18 +31,18 @@ var (
 )
 
 func (SameTag) Label() string { return "same_tag" }
-func (SameTag) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
-	fmt.Println("Not implemented: 'same_tag' versioning mode")
+func (SameTag) ShouldUpdate(currentTag string, availableTags []registry.Tag) *registry.Tag {
+	l.Logger.Errorf("Not implemented: 'same_tag' versioning mode")
 	return nil // TODO: implement me
 }
 
-func semVerShouldUpdate(currentTag string, availableTags []Tag, isValid func(current, available semver.Tag) bool) *Tag {
+func semVerShouldUpdate(currentTag string, availableTags []registry.Tag, isValid func(current, available semver.Tag) bool) *registry.Tag {
 	currentSemVer := semver.ParseTagAsSemVer(currentTag)
 	if currentSemVer == nil {
 		return nil
 	}
 
-	semverTags := make([]Tag, 0)
+	semverTags := make([]registry.Tag, 0)
 
 	for _, tag := range availableTags {
 		if tag.SemVer != nil && isValid(*currentSemVer, *tag.SemVer) {
@@ -63,7 +64,7 @@ func semVerShouldUpdate(currentTag string, availableTags []Tag, isValid func(cur
 }
 
 func (SemVerMajor) Label() string { return "semver_major" }
-func (SemVerMajor) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
+func (SemVerMajor) ShouldUpdate(currentTag string, availableTags []registry.Tag) *registry.Tag {
 	return semVerShouldUpdate(currentTag, availableTags, func(current, available semver.Tag) bool {
 		// The new version should be greater
 		return current.Version.LessThan(available.Version)
@@ -71,7 +72,7 @@ func (SemVerMajor) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
 }
 
 func (SemVerMinor) Label() string { return "semver_minor" }
-func (SemVerMinor) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
+func (SemVerMinor) ShouldUpdate(currentTag string, availableTags []registry.Tag) *registry.Tag {
 	return semVerShouldUpdate(currentTag, availableTags, func(current, available semver.Tag) bool {
 		// The new version should be greater, but still the same major number
 		return current.Version.LessThan(available.Version) &&
@@ -80,7 +81,7 @@ func (SemVerMinor) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
 }
 
 func (SemVerPatch) Label() string { return "semver_patch" }
-func (SemVerPatch) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
+func (SemVerPatch) ShouldUpdate(currentTag string, availableTags []registry.Tag) *registry.Tag {
 	return semVerShouldUpdate(currentTag, availableTags, func(current, available semver.Tag) bool {
 		// The new version should be greater, but still the same major & minor number
 		return current.Version.LessThan(available.Version) &&
@@ -89,7 +90,7 @@ func (SemVerPatch) ShouldUpdate(currentTag string, availableTags []Tag) *Tag {
 	})
 }
 
-func ParseVersioningMode(input string) *VersioningMode {
+func ParseMode(input string) *Mode {
 	for _, mode := range AllModes {
 		if mode.Label() == input {
 			return &mode
