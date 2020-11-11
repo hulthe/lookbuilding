@@ -1,6 +1,4 @@
 # lookbuilding
-_WIP_
-
 Scuffed lookalike of watchtower
 
 This project will, when triggered by an http request, scan the
