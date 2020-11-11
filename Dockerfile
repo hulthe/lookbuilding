@@ -11,7 +11,7 @@ RUN go mod download
 
 # Copy source and build app
 COPY . /app
-RUN go build .
+RUN go build hulthe.net/lookbuilding/cmd/lookbuilding
 
 FROM alpine
 

@@ -64,7 +64,10 @@ func checkAndDoUpdate() {
 		panic(err)
 	}
 
-	labeledContainers := docker.GetLabeledContainers(cli)
+	labeledContainers, err := docker.GetLabeledContainers(cli)
+	if err != nil {
+		panic(err)
+	}
 
 	l.Logger.Infof("found %d valid containers", len(labeledContainers))
 
@@ -85,25 +88,24 @@ func checkAndDoUpdate() {
 			panic(err)
 		}
 
-		l.Logger.Infof(`tags in registry for "%s": %d`, name, len(repoTags))
+		l.Logger.Debugf(`tags in registry for "%s": %d`, name, len(repoTags))
 		for _, tag := range repoTags {
 			svt := semver.ParseTagAsSemVer(tag.Name)
-			l.Logger.Infof(`tag_name="%s" semver=%t`, tag.Name, svt != nil)
+			l.Logger.Debugf(`tag_name="%s" semver=%t`, tag.Name, svt != nil)
 		}
 
-		shouldUpdateTo := lc.Mode.ShouldUpdate(*tag, repoTags)
+		shouldUpdateTo := lc.Mode.ShouldUpdate(lc, repoTags)
 		if shouldUpdateTo != nil {
-			l.Logger.Infof(`updating %s from %s to: %s`, name, *tag, shouldUpdateTo.Name)
+			l.Logger.Infof(`updating %s from %s to %s`, name, *tag, shouldUpdateTo.Name)
 
-			go func() {
-				err = lc.UpdateTo(cli, *shouldUpdateTo)
-				if err != nil {
-					l.Logger.Error(err)
-				}
-			}()
+			err = lc.UpdateTo(cli, *shouldUpdateTo)
+			if err != nil {
+				l.Logger.Error(err)
+			}
 		} else {
 			l.Logger.Infof("no update available for container %s", name)
 		}
 	}
+
 	l.Logger.Infof("all done")
 }

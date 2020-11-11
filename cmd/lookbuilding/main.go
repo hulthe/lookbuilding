@@ -12,6 +12,8 @@ import (
 const EnvAddr = "LOOKBUILDING_ADDR"
 
 func main() {
+	//l.Logger.Level = logrus.DebugLevel
+
 	addr, isPresent := os.LookupEnv(EnvAddr)
 	if !isPresent {
 		addr = "0.0.0.0:8000"

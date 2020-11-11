@@ -11,10 +11,10 @@ import (
 )
 
 type Tag struct {
-	Name   string
-	SemVer *semver.Tag
+	Name       string
+	SemVer     *semver.Tag
 	repository string
-	cache  cache
+	cache      cache
 }
 
 type Client struct {
@@ -23,7 +23,7 @@ type Client struct {
 
 func (tag Tag) GetDigest() (digest.Digest, error) {
 	responseCh := make(chan digestResp)
-	tag.cache.DigestReq <- digestReq{ tag.repository, tag.Name, responseCh	}
+	tag.cache.DigestReq <- digestReq{tag.repository, tag.Name, responseCh}
 	resp := <-responseCh
 	return resp.Data, resp.Error
 }
@@ -34,9 +34,8 @@ func (client Client) GetRepoTags(maybeOwner *string, repository string) ([]Tag, 
 	}
 
 	responseCh := make(chan tagListResp)
-	client.cache.TagListReq <- tagListReq { repository, responseCh }
+	client.cache.TagListReq <- tagListReq{repository, responseCh}
 	resp := <-responseCh
-
 	return resp.Data, resp.Error
 }
 

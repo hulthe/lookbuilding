@@ -42,7 +42,6 @@ func (lc LabeledContainer) GetName() string {
 	}
 }
 
-
 func CombineImageParts(owner *string, repository string, tag *string) string {
 	image := repository
 	if owner != nil {
