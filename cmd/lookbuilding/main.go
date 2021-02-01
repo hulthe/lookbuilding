@@ -24,6 +24,11 @@ func main() {
 		fmt.Fprintf(w, "OK")
 	})
 
+	http.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) {
+		// TODO: if the last scan errored, this should not return OK
+		fmt.Fprintf(w, "OK")
+	})
+
 	fs := http.FileServer(http.Dir("static/"))
 	http.Handle("/static/", http.StripPrefix("/static/", fs))
 
