@@ -46,7 +46,7 @@ func GetLabeledContainers(cli *client.Client) ([]LabeledContainer, error) {
 
 				inspect, _, err := cli.ImageInspectWithRaw(context.Background(), container.ImageID)
 				if err != nil {
-					errors.Wrapf(err, "failed to inspect container %s", lc.GetName())
+					return nil, errors.Wrapf(err, "failed to inspect container %s", lc.GetName())
 				}
 
 				if len(inspect.RepoDigests) >= 2 {
@@ -110,36 +110,30 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag registry.Tag) error 
 		return errors.Wrapf(err, `failed to inspect container "%s"`, lc.GetName())
 	}
 
-	oldTmpName := fmt.Sprintf("%s.lb.old", lc.GetName())
+	tmpName := fmt.Sprintf("%s.lb.new", lc.GetName())
 
 	config := *oldContainer.Config
 	config.Image = image
 
 	hostConfig := *oldContainer.HostConfig
-	hostConfig.VolumesFrom = []string{oldTmpName}
+	hostConfig.VolumesFrom = []string{lc.GetName()}
 
-	l.Logger.Infof(`renaming container %s to %s`, lc.GetName(), oldTmpName)
-	err = cli.ContainerRename(ctx, lc.Container.ID, oldTmpName)
-	if err != nil {
-		return errors.Wrapf(err, `failed to rename container "%s" to "%s"`, lc.GetName(), oldTmpName)
-	}
-
-	l.Logger.Infof("creating new container %s", lc.GetName())
+	l.Logger.Infof("creating new container %s", tmpName)
 	new, err := cli.ContainerCreate(ctx, &config, &hostConfig, &network.NetworkingConfig{
 		EndpointsConfig: oldContainer.NetworkSettings.Networks,
-	}, lc.GetName())
+	}, tmpName)
 
 	if err != nil {
 		return errors.Wrapf(err, `failed to create container for new version of %s`, image)
 	}
 
-	l.Logger.Infof("starting new container %s with id %s", lc.GetName(), new.ID)
+	l.Logger.Infof("starting new container %s with id %s", tmpName, new.ID)
 	err = cli.ContainerStart(ctx, new.ID, types.ContainerStartOptions{})
 	if err != nil {
 		return err
 	}
 
-	l.Logger.Infof("removing old container %s", oldTmpName)
+	l.Logger.Infof("removing old container %s", lc.GetName())
 	err = cli.ContainerRemove(ctx, oldContainer.ID, types.ContainerRemoveOptions{
 		RemoveVolumes: false,
 		RemoveLinks:   false,
@@ -147,6 +141,12 @@ func (lc LabeledContainer) UpdateTo(cli *client.Client, tag registry.Tag) error 
 	})
 	if err != nil {
 		return err
+	}
+
+	l.Logger.Infof(`renaming container %s to %s`, tmpName, lc.GetName())
+	err = cli.ContainerRename(ctx, new.ID, lc.GetName())
+	if err != nil {
+		return errors.Wrapf(err, `failed to rename container "%s" to "%s"`, tmpName, lc.GetName())
 	}
 
 	return nil
